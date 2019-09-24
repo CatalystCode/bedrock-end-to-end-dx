@@ -40,19 +40,19 @@ This creates a `infra.json` file with the following:
 
 ```js
 {
-	name: 'my-azure-simple',
+    name: 'my-azure-simple',
     source: 'https://github.com/microsoft/bedrock/tree/master/cluster/environments/azure-simple',
     version: 'd7d905e6551',
     variables: {
-		resource_group_name: '<resource-group-name>',
+	resource_group_name: '<resource-group-name>',
         cluster_name: '<cluster-name>',
         agent_vm_count: 3,
         service_principal_id: '<client-id>',
- 		service_principal_secret: '<client-secret>',
+ 	service_principal_secret: '<client-secret>',
         ssh_public_key: "public-key"
         gitops_ssh_url: "git@github.com:timfpark/fabrikate-cloud-native-manifests.git"
-	    gitops_ssh_key: "<path to private gitops repo key>"
-		vnet_name: "<vnet name>"
+	gitops_ssh_key: "<path to private gitops repo key>"
+	vnet_name: "<vnet name>"
     }
 }
 ```
