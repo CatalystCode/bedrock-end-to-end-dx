@@ -1,58 +1,61 @@
-# Bedrock Developer Experience "North Star"
+# Bedrock Developer & Operations Experience "North Star"
 
-A scenario based description of how someone might use all of the tools and components in Bedrock in the glorous future to easily define, build, deploy, and maintain workload in Kubernetes.  Eventually, the goal is to turn this document into a walk through of the platform in our documentation, and a video of how the operational process we have defined works end to end.
+A scenario based description how all the tools and components in Bedrock fit together to easily define, build, deploy, and maintain a workload running in a Kubernetes cluster.
 
-THERE ARE NO SACRED COWS IN THIS DOCUMENT.  In fact, quite the opposite, I suspect there are better ideas out there for many parts of this experience.  This document is meant to stimulate that discussion, tease out the details, and describe the best end to end coherent developer/ops experience we can.
+THERE ARE NO SACRED COWS IN THIS DOCUMENT. Please point out misunderstandings, problems, and places that the experience could be better.
 
-## Creating First Cluster
+## Getting Started
 
-Oddveig, a person in an operations role, has heard about Bedrock from others in her company using it and would like to try it out.
+Olina, who is in an operations role at a company called Fabrikam, has heard about Bedrock from others in her company and would like to use it on a project he is leading to launch a microservice workload called `discovery-service`.
 
-She heads over to the Bedrock repo, and after reading the overview description, tries the Quickstart with Azure.
+He first installs the `spk` tool, which provides helpful automation around defining and operating Kubernetes clusters with Bedrock  principles:
 
-The Quickstart first asks her to install the `spk` tool:
-```bash
-$ ???
-```
-
-She has a new development machine with this role, so she uses `spk` to install all of the prerequisites:
+TODO: How is tool installed?
 
 ```bash
-$ spk prereqs install
+$ wget https://github.com/microsoft/spektate/releases/download/1.0.1/spk-v1.0.1-darwin-amd64.zip
+$ unzip spk-v1.0.1-darwin-amd64.zip
+$ mv spk ~/bin
 ```
 
-This installs all of the prereqs on her machine that she needs.
-
-The next step in the quickstep is to create her own local cluster environment definition based off of the `azure-simple` template, so she first creates a directory for that environment:
+This is a new role for him, and he has a new development machine, so he uses `spk` to install all of the dependencies that it needs:
 
 ```bash
-$ mkdir my-azure-simple
-$ cd my-azure-simple
+$ spk deps install
 ```
 
-And then uses `spk` to scaffold an environment  based off of the `azure-simple` template.
+## Creating Cluster Definition
+
+She creates a definition for the infrastructure deployment that she wants to do, based off of a single cluster environment template that her company maintains called `fabrikam-azure-single-keyvault`.  She creates a new directory for this deployment called `discovery-service-deployment`:
 
 ```bash
-$ spk infra scaffold https://github.com/microsoft/bedrock/azure-simple
+$ mkdir discovery-service-deployment
+$ cd discovery-service-deployment
 ```
 
-This creates a `infra.json` file with the following:
+And then uses `spk` to scaffold an environment based off of the `azure-simple` template.
+
+```bash
+$ spk infra scaffold discovery-service-deployment https://github.com/fabrikam/bedrock-templates/tree/master/cluster/environments/fabrikam-azure-single-keyvault
+```
+
+This creates a `infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a prefilled set of configuration variables with defaults (if applicable).
 
 ```js
 {
-    name: 'my-azure-simple',
-    source: 'https://github.com/microsoft/bedrock/tree/master/cluster/environments/azure-simple',
+    name: 'discovery-service-deployment',
+    source: 'https://github.com/fabrikam/bedrock-templates/tree/master/cluster/environments/fabrikam-azure-single-keyvault',
     version: 'd7d905e6551',
     variables: {
-	resource_group_name: '<resource-group-name>',
+	    resource_group_name: '<resource-group-name>',
         cluster_name: '<cluster-name>',
         agent_vm_count: 3,
         service_principal_id: '<client-id>',
- 	service_principal_secret: '<client-secret>',
+ 	    service_principal_secret: '<client-secret>',
         ssh_public_key: "public-key"
-        gitops_ssh_url: "git@github.com:timfpark/fabrikate-cloud-native-manifests.git"
-	gitops_ssh_key: "<path to private gitops repo key>"
-	vnet_name: "<vnet name>"
+        gitops_ssh_url: "git@github.com:fabrikam/fabrikate-cloud-native-manifests.git"
+	    gitops_ssh_key: "<path to private gitops repo key>"
+	    vnet_name: "<vnet name>"
     }
 }
 ```
@@ -63,51 +66,55 @@ She fills in all of the variables for her particular cluster and then generates 
 $ spk infra generate
 ```
 
-This creates a Terraform template from the base template at the specified version from the definition in the current directory.  She can later bump the version and regenerate the Terraform template.   (In some workflows, this could also be used in a CI/CD orchestration to generate the Terraform template that is then applied.)
+This creates a Terraform template from the base template at the specified version from the definition in the current directory.  She can later bump the version and regenerate the Terraform template, and when in the future `discovery-service` grows to be a service that her company deploys in multiple clusters in multiple regions, she can also use this to easily stamp out multiple clusters with largely common, but when necessary, differentiated, config.
 
-One implication of this is that the Terraform code is generated and therefore should be regarded as immutable output.
+## Scaffolding GitOps Pipeline
 
-She’s happy with the generated Terraform code, so she inits and applies it with Terraform:
+In the bedrock GitOps deployment methodology, code commits in the application repo trigger building a container, which in turn triggers a release step that commits the new image tag for this container to a Fabrikate high level definition repo.  This commit to the high level definition triggers a build that generates and commits the resource manifests into a repo that the cluster then uses as its store of record for what should be deployed into the cluster.
+
+TODO: Add diagram to make this more concrete.
+
+Setting all of this up by hand is hard, error prone, and tedious.  Instead, she wants to generate the resource manifests for her repo above using this Fabrikate definition so she scaffolds out a Gitops pipeline definition:
 
 ```bash
-$ terraform init
-$ terraform apply
+$ spk gitops scaffold
 ```
 
-The cluster spins up and deploys the stock workload manifests in the repo  `gitops_ssh_url`
+This creates a gitops pipeline definition that looks like this:
 
-## Creating first manifest repo
-
-After trying out the ‘hello-world’ workload that was provided as part of the template, she wants to use her own workload.
-
-She creates a new manifest repo in Github, adds the gitops ssh key to the repo, and then adjusts `gitops_ssh_url` to `git@github.com:oddveig/cluster-resource-manifests.git`.
-
-She then regenerates the Terraform templates with `spk`:
-
-```bash
-$ spk infra generate
+```yaml
+orchestrator: azure-devops
+repos:
+  fabrikateDefinition:
+  resourceManifests:
 ```
 
-And recreates the cluster with:
+which she edits to include the relevant and necessary details of the repos she would like to create.
 
-```bash
-$ terraform destroy
-$ terraform apply
+```yaml
+orchestrator: azure-devops
+repos:
+  fabrikateDefinition: git@github.com:fabrikam/discovery-cluster-definition.git
+    fromTemplate: git@github.com:fabrikam/default-cluster-definition.git
+  resourceManifests: git@github.com:fabrikam/discovery-cluster-manifests.git
 ```
 
-The cluster now uses her repo instead and she can check in Kubernetes manifests to it and have them deployed to the cluster.
-
-## Building a first Fabrikate definition
-
-She does this for a bit, and quickly realizes that committing YAML directly is difficult and error prone and that she wants to use Helm to template these deployments.
-
-Furthermore, she wants to be able to compose the config for these deployments eventually across a number of different clusters and also utilize a preconfigured stack component that her company maintains and so decides to build a high level definition with Fabrikate for it.
-
-To do this, she first creates a directory for her high level definition project:
+She then creates the gitops pipeline with:
 
 ```bash
-$ mkdir my-cluster-hld
-$ cd my-cluster-hld
+$ spk gitops create
+```
+
+This creates the repos (if they do not currently exist) and the Azure Devops pipeline to automatically build the Fabrikate definition in `github.com/oddveig/cluster-fabrikate-definition` into resource manifests that are committed in `github.com/oddveig/cluster-resource-manifests`.
+
+## Building High Level Definition for Workload
+
+This automation creates the plumbing for building and deploying a cluster but she still needs to define what workload should be deployed in these clusters.
+
+To do this, she first clones the high level definition repo that the automation created above:
+
+```bash
+$ git clone https://github.com/fabrikam/discovery-cluster-definition
 ```
 
 She then uses fabrikate to add the common stack her company uses across Kubenetes deployments:
@@ -129,58 +136,50 @@ subcomponents:
   branch: master
 ```
 
-which she checks into `github.com/oddveig/cluster-fabrikate-defintion`
+which she then commits back to the repo. This triggers the generation process and this deployment definition will be built into resource manifests that are committed to `github.com:fabrikam/discovery-cluster-manifests`.
 
-She wants to generate the resource manifests for her repo above using this Fabrikate definition so she scaffolds out a Gitops pipeline:
+## Adopting Bedrock in Existing Application Monorepo
 
-```bash
-$ spk gitops scaffold
-```
+With her cluster definition created, her GitOps pipeline operational, and a base deployment definition in place, she tells Dag, a developer in the team that he can start adding the `discovery-service` services to the deployment.
 
-This creates a gitops pipeline definition that looks like this:
-
-```yaml
-orchestrator: azure-devops
-repos:
-  fabrikateDefinition:
-  resourceManifests:
-```
-
-which she edits to include the relevant and necessary details:
-
-```yaml
-orchestrator: azure-devops
-repos:
-  fabrikateDefinition: git@github.com:oddveig/cluster-fabrikate-definition.git
-  resourceManifests: git@github.com:oddveig/cluster-resource-manifests.git
-```
-
-She then creates the gitops pipeline with:
+As we mentioned at the outset, `discovery-service` is a service that is already in deployment in a virtualized environment and has been developed in a [monorepo](https://en.wikipedia.org/wiki/Monorepo) style. As we mentioned, Dag wants to use Bedrock to deploy these microservices, so he navigates to the root of this monorepo that he has cloned on his machine:
 
 ```bash
-$ spk gitops create
+$ cd discovery-service
 ```
 
-This creates the repos (if necessary) and the Azure Devops pipeline to automatically build the Fabrikate definition in `github.com/oddveig/cluster-fabrikate-definition` into resource manifests that are stored in `github.com/oddveig/cluster-resource-manifests`.
+and then uses `spk` to initialize it:
+
+```bash
+$ spk project init -m
+```
+
+where `-m` indicates to `spk` that this a monorepo for multiple microservices.
+
+TODO: What files does this define and what are their purposes?
+
+## Defining Rings for Services
+
+The `discovery-service` team also uses the Rings service deployment model with three rings: `dev`, `qa`, and `prod`. In this deployment model, requests are routed to specific instances of a deployment based on specific group membership that is attached to the request. In the case of Fabrikam and the `discovery-service`, this group membership is applied to requests as part of a header that is then routed into the cluster.
+
+TODO: How do we see the definition of rings for services in the long term?
 
 ## Adding a Service
 
-With her cluster created and her GitOps pipeline operational, she tells Dana, a developer in the team.
+She starts by creating the service itself. She checks out the Fabrikate definition that Olina established and creates a development branch called `add_proxy_service` to add `proxy-service`, an individual microservice that composes in part the overall `discovery-service`
 
-Dana is excited to hear the cluster is in place and wants to deploy her `search` microservice into it.  Her team uses the rings service maturity model and three rings: `dev`, `qa`, and `prod`.
+She then initializes this new service with:
 
-She starts by creating the service itself.  She checks out the Fabrikate definition that Oddveig established and creates a development branch called `search_service`.
-
-She then scaffolds out a new service with:
-
+TODO: How does this work?
 ```bash
-??? $ spk service scaffold search-service  ???
+$ spk service scaffold search-service
 ```
 
-TODO: How do we tie the service repo into this?
-TODO: How does the pipeline get deployed for service repo -> Fabrikate definition?
+TODO: What is created?
 
 ## Adding a Service Revision Ring
+
+TODO: How does all of this work?
 
 With the service created, she next wants to add the rings for the service.  She starts with the `dev` ring:
 
@@ -188,18 +187,18 @@ With the service created, she next wants to add the rings for the service.  She 
 ??? $ spk ring scaffold search-service dev ???
 ```
 
-She has now created the `search` service with three rings as a set of changes in the Fabrikate deployment.  As part of the development and ops team's workflow, they always use pull requests and code reviews of these changes.
+She has now created `proxy-service` with three rings as a set of changes in the Fabrikate deployment.  As part of the development and ops team's workflow, they always use pull requests and code reviews of these changes.
 
-She creates a PR for the changes and asks Oddveig to review.  Oddveig approves the PR, merges it to master.
+She creates a PR for the changes and asks Olina to review.  Olina approves the PR, merges it to master.
 
 ## Observing Deployments
 
-The merge to master that Oddveig makes kicks off the GitOps pipeline that we built earlier.  In the absence of tooling, this GitOps pipeline is observable, but only through manual navigation to various Azure Devops pages and manually collecting logs from Flux in the cluster.
+The merge to master that Olina makes kicks off the GitOps pipeline that we built earlier.  In the absence of tooling, this GitOps pipeline is observable, but only through manual navigation to various Azure Devops stages and manually collecting logs from Flux in the cluster.
 
 Instead Dana wants to observe the process in her command line and she uses the `spk` command line tool to do this:
 
 ```bash
-$ spk service get --service search-service --watch  ???
+$ spk deployment get --service proxy-service --watch  ???
 ```
 
 which displays a new log line in her console as each step is completed that looks like:
