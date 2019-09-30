@@ -1,4 +1,4 @@
-# Bedrock Developer & Operations Experience "North Star"
+# Bedrock Developer and Operations Experience "North Star"
 
 A scenario based description how all the tools and components in Bedrock fit together to easily define, build, deploy, and maintain a workload running in a Kubernetes cluster.
 
@@ -10,60 +10,64 @@ Olina, who is in an operations role at a company called Fabrikam, has heard abou
 
 He first installs the `spk` tool, which provides helpful automation around defining and operating Kubernetes clusters with Bedrock  principles:
 
-TODO: How is tool installed?
+TODO: Confirm this is how we are going to install `spk`
 
 ```bash
 $ wget https://github.com/microsoft/spektate/releases/download/1.0.1/spk-v1.0.1-darwin-amd64.zip
 $ unzip spk-v1.0.1-darwin-amd64.zip
-$ mv spk ~/bin
+$ mv spk ~/bin (or as appropriate to place it in your path)
 ```
 
-This is a new role for him, and he has a new development machine, so he uses `spk` to install all of the dependencies that it needs:
+## Initializing Infrastructure
+
+With `spk` installed, she initializes the `spk` tool with:
 
 ```bash
-$ spk deps install
+$ spk init
 ```
+
+This creates a `~/.spk/config` file with auth details, validates that prereqs are installed (`git`, `terraform`, `helm`, `az` cli tools), inventories their versions, and validates that they are compatible with `spk`. The tool notices that she does not have a compatible version of `helm` and asks her to update it, which she does with her favorite package manager manually, and then reruns `spk init`.
 
 ## Creating Cluster Definition
 
-She creates a definition for the infrastructure deployment that she wants to do, based off of a single cluster environment template that her company maintains called `fabrikam-azure-single-keyvault`.  She creates a new directory for this deployment called `discovery-service-deployment`:
+With her `spk` tool initialized, she moves on to creating her infrastructure deployment project.  She first scaffolds the project with `spk infra scaffold`:
 
 ```bash
-$ mkdir discovery-service-deployment
-$ cd discovery-service-deployment
+$ spk infra scaffold discovery-cluster-infra --bedrock-source https://github.com/fabrikam/bedrock –-container-name discovery-cluster –-backend-key <key>
 ```
 
-And then uses `spk` to scaffold an environment based off of the `azure-simple` template.
-
-```bash
-$ spk infra scaffold discovery-service-deployment https://github.com/fabrikam/bedrock-templates/tree/master/cluster/environments/fabrikam-azure-single-keyvault
-```
-
-This creates a `infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a prefilled set of configuration variables with defaults (if applicable).
+This creates a `discovery-cluster-infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a prefilled set of configuration variables with defaults (if applicable).
 
 ```js
-{
-    name: 'discovery-service-deployment',
-    source: 'https://github.com/fabrikam/bedrock-templates/tree/master/cluster/environments/fabrikam-azure-single-keyvault',
+{​
+    name: 'discovery-cluster-infra',
+    source: 'https://github.com/fabrikam/bedrock/tree/master/cluster/environments/fabrikam-azure-single-keyvault',
     version: 'd7d905e6551',
-    variables: {
-	    resource_group_name: '<resource-group-name>',
-        cluster_name: '<cluster-name>',
-        agent_vm_count: 3,
+
+    resources: [​
+        resource_group_name, vnet_name​
+    ],
+    ​
+    variables: {​
+        resource_group_name: '<resource-group-name>',​
+        cluster_name: '<cluster-name>',​
+        agent_vm_count: 3,​
         service_principal_id: '<client-id>',
- 	    service_principal_secret: '<client-secret>',
-        ssh_public_key: "public-key"
-        gitops_ssh_url: "git@github.com:fabrikam/fabrikate-cloud-native-manifests.git"
-	    gitops_ssh_key: "<path to private gitops repo key>"
-	    vnet_name: "<vnet name>"
-    }
+        service_principal_secret: '<client-secret>',​
+        ssh_public_key: "public-key"​
+        gitops_ssh_url: "git@github.com:timfpark/fabrikate-cloud-native-manifests.git"​
+        gitops_ssh_key: "<path to private gitops repo key>"​
+        vnet_name: "<vnet name>"​
+    }​
 }
 ```
+
+TODO: Should service principal details be in this file? (probably not, since it will be checked in)
 
 She fills in all of the variables for her particular cluster and then generates the environment:
 
 ```bash
-$ spk infra generate
+$ spk infra generate discovery-cluster-infra
 ```
 
 This creates a Terraform template from the base template at the specified version from the definition in the current directory.  She can later bump the version and regenerate the Terraform template, and when in the future `discovery-service` grows to be a service that her company deploys in multiple clusters in multiple regions, she can also use this to easily stamp out multiple clusters with largely common, but when necessary, differentiated, config.
@@ -105,7 +109,7 @@ She then creates the gitops pipeline with:
 $ spk gitops create
 ```
 
-This creates the repos (if they do not currently exist) and the Azure Devops pipeline to automatically build the Fabrikate definition in `github.com/oddveig/cluster-fabrikate-definition` into resource manifests that are committed in `github.com/oddveig/cluster-resource-manifests`.
+This creates the repos (if they do not currently exist) and the Azure Devops pipeline to automatically build the Fabrikate definition in `github.com/oddveig/cluster-fabrikate-definition` into resource manifests that are committed in `github.com/oddveig/cluster-resource-manifests`. It also instruments those pipelines such that they can be introspected to understand the current state of the deployment.
 
 ## Building High Level Definition for Workload
 
@@ -172,8 +176,10 @@ She then initializes this new service with:
 
 TODO: How does this work?
 ```bash
-$ spk service scaffold search-service
+$ spk service create proxy-service
 ```
+
+This creates a directory called `proxy-service` in the overall monorepo and scaffolds it out with a `maintainers` and `azure-pipeline.yaml` file.
 
 TODO: What is created?
 
@@ -193,14 +199,18 @@ She creates a PR for the changes and asks Olina to review.  Olina approves the P
 
 ## Observing Deployments
 
-The merge to master that Olina makes kicks off the GitOps pipeline that we built earlier.  In the absence of tooling, this GitOps pipeline is observable, but only through manual navigation to various Azure Devops stages and manually collecting logs from Flux in the cluster.
+The merge to master that Olina makes kicks off the GitOps pipeline that we built earlier. In the absence of tooling, this GitOps pipeline is observable, but only through manual navigation to various Azure Devops stages and manually collecting logs from Flux in the cluster.
+
+```bash
+$ spk deployment init --storage-account=xxxx --storage-key=xxxx ...
+```
 
 Instead Dana wants to observe the process in her command line and she uses the `spk` command line tool to do this:
 
 ```bash
-$ spk deployment get --service proxy-service --watch  ???
+$ spk deployment get --service proxy-service
 ```
 
-which displays a new log line in her console as each step is completed that looks like:
+which displays a new log line in her console as each step is completed that looks like
 
-???
+TODO: Insert table view from output
