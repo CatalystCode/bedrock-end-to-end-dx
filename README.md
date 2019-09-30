@@ -160,52 +160,57 @@ $ spk project init -m
 
 where `-m` indicates to `spk` that this a monorepo for multiple microservices.
 
-TODO: What files does this define and what are their purposes?
+## Adding an Existing Service
 
-## Defining Rings for Services
+The core `discovery-service` microservice already exists, so he grandfathers it into the Bedrock workflow with:
 
-The `discovery-service` team also uses the Rings service deployment model with three rings: `dev`, `qa`, and `prod`. In this deployment model, requests are routed to specific instances of a deployment based on specific group membership that is attached to the request. In the case of Fabrikam and the `discovery-service`, this group membership is applied to requests as part of a header that is then routed into the cluster.
+```bash
+$ spk service create discovery-service
+```
 
-TODO: How do we see the definition of rings for services in the long term?
+This service has an existing `azure-pipelines.yaml` file, so the tool is smart enough to skip adding a scaffolded version, but it does scaffold out both a `maintainers` and `Bedrockconfig` file.
 
-## Adding a Service
+`service create` also uses cached credentials to create a Azure Devops build pipeline for the `azure-pipelines.yaml` file to process on each commit.
 
-She starts by creating the service itself. She checks out the Fabrikate definition that Olina established and creates a development branch called `add_proxy_service` to add `proxy-service`, an individual microservice that composes in part the overall `discovery-service`
+## Adding a New Service
 
-She then initializes this new service with:
+That said, Dag does need to create a second microservice, called the `proxy-service`.  He starts by creating a development branch called `add_proxy_service` on the overall monorepo, and then scaffolds the project with:
 
-TODO: How does this work?
 ```bash
 $ spk service create proxy-service
 ```
 
-This creates a directory called `proxy-service` in the overall monorepo and scaffolds it out with a `maintainers` and `azure-pipeline.yaml` file.
+Since this is a completely new service, this creates a directory called `proxy-service` in the overall monorepo and scaffolds it out with a `maintainers`, `Bedrockconfig`, and `azure-pipeline.yaml` file.
 
 TODO: What is created?
 
-## Adding a Service Revision Ring
+## Deploying Cluster
 
-TODO: How does all of this work?
-
-With the service created, she next wants to add the rings for the service.  She starts with the `dev` ring:
+With all of this defined, Dag notifies Olina, and she deploys the cluster by navigating to the top level directory of her `discovery-cluster-infra` project and executing:
 
 ```bash
-??? $ spk ring scaffold search-service dev ???
+$ spk infra deploy
 ```
 
-She has now created `proxy-service` with three rings as a set of changes in the Fabrikate deployment.  As part of the development and ops team's workflow, they always use pull requests and code reviews of these changes.
+## Introspect Deployments
 
-She creates a PR for the changes and asks Olina to review.  Olina approves the PR, merges it to master.
+As Dag and his development team make changes that are deployed into the cluster, they want to be able to observe how these changes progress from a commit to the source code repo, to pushing the container from that build to ACR, to updating the high level definition with this container's image tag, the manifest being generated from this high level definition change, and Flux applying this change within the cluster.
 
-## Observing Deployments
+In the absence of tooling, all of this GitOps pipeline is observable, but only through manual navigation to all of these various stages and/or manually collecting logs from Flux in the cluster.
 
-The merge to master that Olina makes kicks off the GitOps pipeline that we built earlier. In the absence of tooling, this GitOps pipeline is observable, but only through manual navigation to various Azure Devops stages and manually collecting logs from Flux in the cluster.
+Instead, Dag wants to use `spk` to introspect the status of these deployments. He first initializes the deployment with all of config needed to enable `spk` to have access to various pieces of infrastructure it needs to understand the current state:
 
 ```bash
 $ spk deployment init --storage-account=xxxx --storage-key=xxxx ...
 ```
 
-Instead Dana wants to observe the process in her command line and she uses the `spk` command line tool to do this:
+Next, since his `discovery-service` microservice wasn't initially created with introspection enabled, he adds these hooks with:
+
+```bash
+$ spk deployment add --name discovery-service
+```
+
+This adds introspection to the `discovery-service` pipeline.  With that, on future commits, he can observe deployments with:
 
 ```bash
 $ spk deployment get --service proxy-service
