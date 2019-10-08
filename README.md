@@ -1,6 +1,6 @@
 # Bedrock Developer and Operations Experience "North Star"
 
-A scenario based description how all the tools and components in Bedrock fit together to easily define, build, deploy, and maintain a workload running in a Kubernetes cluster.
+A scenario based description of how all the tools and components in Bedrock fit together to easily define, build, deploy, and maintain a workload running in a Kubernetes cluster.
 
 THERE ARE NO SACRED COWS IN THIS DOCUMENT. Please point out misunderstandings, problems, and places that the experience could be better.
 
@@ -22,6 +22,8 @@ $ mv spk ~/bin (or as appropriate to place it in your path)
 
 With `spk` installed, he initializes the `spk` tool with:
 
+TODO: Is this the case?
+
 ```bash
 $ spk init
 ```
@@ -30,13 +32,15 @@ This creates a `~/.spk/config` file with auth details, validates that prereqs ar
 
 ## Adopting Bedrock in Existing Application Monorepo
 
-With his `spk` tool initialized, he wants to add an existing `discovery-service` service to the project.  `discovery-service` is a service that is already deployed in a virtualized environment and has been developed in a [monorepo](https://en.wikipedia.org/wiki/Monorepo) style. As we mentioned, Dag wants to use Bedrock to deploy these microservices, so he navigates to the root of this monorepo that he has cloned on his machine:
+With his `spk` tool initialized, he wants to add an existing `discovery-service` service to the project. `discovery-service` is a service that is already deployed in a non-containerized environment and has been developed in a [monorepo](https://en.wikipedia.org/wiki/Monorepo) style. As we mentioned, Dag wants to use Bedrock to deploy these microservices, so he navigates to the root of this monorepo that he has cloned on his machine:
 
 ```bash
 $ cd discovery-service
 ```
 
 and then uses `spk` to initialize it:
+
+TODO: Is this still the case?
 
 ```bash
 $ spk project init -m
@@ -54,7 +58,11 @@ $ spk service create discovery-service
 
 This service has an existing `azure-pipelines.yaml` file, so the tool is smart enough to skip adding a scaffolded version, but it does scaffold out both a `maintainers` and `Bedrockconfig` file.
 
+TODO: Is this correct?
+
 `service create` also uses cached credentials to create a Azure Devops build pipeline for the `azure-pipelines.yaml` file to process on each commit to build the application, and in this case, push a container to Azure Container Registry.
+
+Since the high level definition and resource manifest repos specified don't currently exist, it prints a warning that it is creating them, and then creates them with a high level Fabriakte definition that includes this service. It then creates a release pipeline step to automatically update the image in the Fabrikate high level definition with each push to ACR and also creates the build pipeline step to build the high level definition and check the results into resource manifest repo.
 
 ## Adding a New Service
 
@@ -66,9 +74,7 @@ $ spk service create proxy-service
 
 Since this is a completely new service, this creates a directory called `proxy-service` in the overall monorepo and scaffolds it out with a `maintainers`, `Bedrockconfig`, and `azure-pipeline.yaml` file.
 
-Like the previous service, it also creates the SRC->ACR Azure Devops pipeline build step.
-
-TODO: What creates the ACR->HLD image tag release pipeline step?
+Like the previous service, it also creates the source to Azure Container Registry Azure Devops pipeline build step and release step to update the image in the Fabrikate high level definition. However, it checks and notices that the previous service has created all of the other required repos and infrastructure, and so does not need to create them, and finishes.
 
 ## Building High Level Definition for Workload
 
@@ -78,10 +84,10 @@ Once Dag finishes onboarding the services onto Bedrock, he reaches out to Olina,
 $ git clone https://github.com/fabrikam/discovery-cluster-definition
 ```
 
-She then uses Fabrikate to add the common stack her company uses across Kubenetes deployments:
+She then uses Fabrikate to add the common azure-native monitoring and operations stack her company uses across Kubenetes deployments:
 
 ```bash
-$ fab add cloud-native --source https://github.com/microsoft/fabrikate-definitions --path definitions/fabrikate-cloud-native
+$ fab add azure-native --source https://github.com/fabrikam/fabrikate-definitions --path definitions/azure-native
 ```
 
 this creates a `component.yaml` file that is the root  of her Fabikate definition that looks like this:
@@ -89,27 +95,31 @@ this creates a `component.yaml` file that is the root  of her Fabikate definitio
 ```yaml
 name: discovery-cluster-definition
 subcomponents:
-- name: cloud-native
+- name: discovery-service
+  ...
+- name: new-service
+  ...
+- name: azrure-native
   type: component
-  source: https://github.com/microsoft/fabrikate-definitions
+  source: https://github.com/fabrikam/fabrikate-definitions
   method: git
-  path: definitions/fabrikate-cloud-native
+  path: definitions/azure-native
   branch: master
 ```
 
 which she then commits back to the repo. This triggers the generation process and this deployment definition will be built into resource manifests that are committed to `github.com/fabrikam/discovery-cluster-manifests`.
 
-TODO: What creates the HLD->Manifest Azure Devops pipeline stage?
-
 ## Creating Cluster Definition
 
- she moves on to creating her infrastructure deployment project.  She first scaffolds the project with `spk infra scaffold`:
+Olina then moves on to creating her infrastructure deployment project.  She first scaffolds the project with `spk infra scaffold`:
 
 ```bash
 $ spk infra scaffold discovery-cluster-infra --bedrock-source https://github.com/fabrikam/bedrock –-container-name discovery-cluster –-backend-key <key>
 ```
 
 This creates a `discovery-cluster-infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a prefilled set of configuration variables with defaults (if applicable).
+
+TODO: How do we handle multiple clusters in this model?
 
 ```js
 {​
