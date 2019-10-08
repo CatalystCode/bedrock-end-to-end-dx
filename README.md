@@ -109,17 +109,17 @@ subcomponents:
 
 which she then commits back to the repo. This triggers the generation process and this deployment definition will be built into resource manifests that are committed to `github.com/fabrikam/discovery-cluster-manifests`.
 
-## Creating Cluster Definition
+## Scaffolding a Cluster Definition
 
-Olina then moves on to creating her infrastructure deployment project.  She first scaffolds the project with `spk infra scaffold`:
+Olina then moves on to wanting to create her infrastructure deployment definition.  She suspects that the project may grow beyond just a single infra deployment.  Each deployment will be similar in structure but differ in settings (region, connection strings, etc)
+
+To scaffold the skeleton of the project, she issued the `spk infra scaffold` command:
 
 ```bash
 $ spk infra scaffold discovery-cluster-infra --bedrock-source https://github.com/fabrikam/bedrock –-container-name discovery-cluster –-backend-key <key>
 ```
 
-This creates a `discovery-cluster-infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a prefilled set of configuration variables with defaults (if applicable).
-
-TODO: How do we handle multiple clusters in this model?
+This creates a `discovery-cluster-infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a set of variables (with defaults where appropriate) that must be defined for each deployment.
 
 ```js
 {​
@@ -145,22 +145,63 @@ TODO: How do we handle multiple clusters in this model?
 }
 ```
 
+## Creating a Specific Cluster Definition
+
+Now that Olina has scaffolded out her desired template for infrascture deployment, she must define one or more specific deployments.  To do this, she issues the command:
+
+```bash
+$ spk infra define --definition discovery-cluster-infra --name discovery-cluster-west
+```
+
+What this does is, using the `discovery-cluster-infra.json` file generated using `spk scaffold`, a cluster definition json `discovery-cluster-one.json` is generated along side the `discovery-cluster-infra.json` file with specific information filled in to the cluster.  These may be handled by either a set of `key:value` pairs on the command line or hand editted once the `discovery-cluster-west.json` file is generated.  The file resembles:
+
+```js
+{​
+    name: 'discovery-cluster-west',
+    base_config: 'discovery-cluster-infra',
+    type: 'cluster-definition',
+​
+    variables: {​
+        resource_group_name: '<resource-group-name>',​
+        cluster_name: 'discovery-cluster-west,​
+        agent_vm_count: 3,​
+        service_principal_id: '<client-id>',
+        service_principal_secret: '<client-secret>',​
+        ssh_public_key: "public-key"​
+        gitops_ssh_url: "git@github.com:timfpark/fabrikate-cloud-native-manifests.git"​
+        gitops_ssh_key: "<path to private gitops repo key>"​
+        vnet_name: "<vnet name>"​
+    }​
+}
+```
+
+Olina can repeat this process for additional deployment definitions, say for `east` as `discovery-cluster-east`.
+
 TODO: Should service principal details be in this file? (probably not, since it will be checked in)
 
-She fills in all of the variables for her particular cluster and then generates the environment:
+## Generating Cluster Terraform Templates
+
+When Olina is done defining her cluster definitions, she will need to generate Terraform sctips (and variables) in order to deploy the cluster(s).  This is handled with the command:
 
 ```bash
 $ spk infra generate discovery-cluster-infra
 ```
 
-This creates a Terraform template from the base template at the specified version from the definition in the current directory.  She can later bump the version and regenerate the Terraform template, and when `discovery-service` grows in the future to be a service that her company deploys in multiple clusters in multiple regions, she can also use this to easily stamp out multiple clusters with largely common, but when necessary -- differentiated -- config.
+This command will parse through each of the defined clusters, and using the base template create a Terraform template and corresponding `tfvar` file for each of the clusters defined.
+
+If for some reason, Olina was just interested in updating a single cluster definition, she could use the same command as follows:
+
+```bash
+$ spk infra generate discovery-cluster-infra --name discovery-cluster-east
+```
 
 ## Deploying Cluster
 
-With all of this defined, Dag notifies Olina, and she deploys the cluster by navigating to the top level directory of her `discovery-cluster-infra` project and executing:
+With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.
 
 ```bash
-$ spk infra deploy
+$ terraform init
+$ terraform apply -var-file=discovery-cluster-west.tfvars
 ```
 
 ## Introspect Deployments
