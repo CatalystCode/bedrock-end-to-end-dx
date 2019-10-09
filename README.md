@@ -76,7 +76,7 @@ Since this is a completely new service, this creates a directory called `proxy-s
 
 Like the previous service, it also creates the source to Azure Container Registry Azure Devops pipeline build step and release step to update the image in the Fabrikate high level definition. However, it checks and notices that the previous service has created all of the other required repos and infrastructure, and so does not need to create them, and finishes.
 
-## Building High Level Definition for Workload
+## Building High Level Definition
 
 Once Dag finishes onboarding the services onto Bedrock, he reaches out to Olina, a colleague in an operations role at Fabrikam, to have her start work on a high level definition of the workload in the cluster.  To do this, she first creates a high level definition repo `discovery-cluster-definition`, and clones it into a local directory.
 
@@ -231,7 +231,7 @@ In the case where Olina might want to take some time off, she needs a process so
 
 As Dag and his development team make changes that are deployed into the cluster, they want to be able to observe how these changes progress from a commit to the source code repo, to pushing the container from that build to ACR, to updating the high level definition with this container's image tag, the manifest being generated from this high level definition change, and Flux applying this change within the cluster.
 
-In the absence of tooling, all of this GitOps pipeline is observable, but only through manual navigation to all of these various stages and/or manually collecting logs from Flux in the cluster.
+In the absence of tooling, all of this GitOps pipeline is observable, but only through manual navigation to all of these various stages and/or manually collecting logs from Flux in the cluster. This is tedious and less than ideal.
 
 Instead, Dag wants to use `spk` to introspect the status of these deployments. He first initializes the deployment with all of config needed to enable `spk` to have access to various pieces of infrastructure it needs to understand the current state:
 
@@ -254,3 +254,17 @@ $ spk deployment get --service proxy-service
 which displays a new log line in her console as each step is completed that looks like
 
 TODO: Insert table view from output
+
+## Updating to New Infra Template Version
+
+After several weeks, Olina returns to the `discovery-service` project upon the request of her lead.  In the meantime, the central infra template they use for their application cluster deployments, `fabrikam-single-keyvault` has added a new piece of Azure infrastructure that they would like to include in the `east` and `west` cluster deployments they currently have in operations.
+
+Because she used `spk` to build her infra deployment definitions, she can do this by simply adjusting the `version` field in her `east` cluster deployment to the new tag `3bfeff7f77`, and then regenerating the infra deployment templates with:
+
+```bash
+$ spk infra generate
+```
+
+This will clone the `fabrikam-single-keyvault` environment template at this new version and use it to generate the new set of Terraform environment files with the existing variables in her `definition.json` files.
+
+She then reapplies the `east` cluster, watches the deployment successfully apply, and then repeats the procedure on the `west` cluster to complete the upgrade to the latest version of the central template.
