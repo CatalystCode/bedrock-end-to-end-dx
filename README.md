@@ -78,7 +78,7 @@ Like the previous service, it also creates the source to Azure Container Registr
 
 ## Building High Level Definition for Workload
 
-Once Dag finishes onboarding the services onto Bedrock, he reaches out to Olina, a colleague in an operations role at Fabrikam, to have her start work on a high level definition of the workload in the cluster.  To do this, she first creates a high level definition repo `discovery-cluster-definition`, and clones it into a local directory.
+Once Dag finishes onboarding the services onto Bedrock, he reaches out to Olina, a colleague in an operations role at Fabrikam, to have her start work on a high level definition of the workload in the cluster.  To do this, she first clones the high level definition repo `discovery-cluster-definition` into a local directory.
 
 ```bash
 $ git clone https://github.com/fabrikam/discovery-cluster-definition
@@ -99,7 +99,7 @@ subcomponents:
   ...
 - name: new-service
   ...
-- name: azrure-native
+- name: azure-native
   type: component
   source: https://github.com/fabrikam/fabrikate-definitions
   method: git
@@ -109,123 +109,166 @@ subcomponents:
 
 which she then commits back to the repo. This triggers the generation process and this deployment definition will be built into resource manifests that are committed to `github.com/fabrikam/discovery-cluster-manifests`.
 
-## Scaffolding a Cluster Definition
+## Building Cluster Definition
 
-Olina then moves on to wanting to create her infrastructure deployment definition.  She suspects that the project may grow beyond just a single infra deployment.  Each deployment will be similar in structure but differ in settings (region, connection strings, etc)
-
-To scaffold the skeleton of the project, she issued the `spk infra scaffold` command:
+Olina then moves on to create her infrastructure deployment definition.  She suspects that the project may grow beyond just a single cluster to multiple clusters and wants to be able to scalably add clusters without having to hand manage N sets of Terraform scripts. Each deployment will be similar in structure but differ in a few configuration values (region, connection strings, etc). Infrastructure definitions with `spk` are hierarchical, with each layer inheriting from the layer above it, so she starts by creating the globally common definition between all of her infrastructure:
 
 ```bash
-$ spk infra scaffold --name discovery-cluster-infra --bedrock-source https://github.com/fabrikam/bedrock –-container-name discovery-cluster –-backend-key <key>
+$ spk infra scaffold --name discovery-service --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-common-infra
 ```
 
-This creates a `discovery-cluster-infra.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team) and a set of variables (with defaults where appropriate) that must be defined for each deployment.
+This creates a directory called `discovery-service` and places a `definition.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team without them opting into a change) and a block for setting variables that are globally the same for the discovery-service and a Terraform template called `fabrikam-common-infra` that contains all of their common infrastructure items.
 
 ```js
 {​
-    name: "discovery-cluster-infra",
-    source: "https://github.com/fabrikam/bedrock/tree/master/cluster/environments/fabrikam-azure-single-keyvault",
+    name: "discovery-service",
+    source: "https://github.com/fabrikam/bedrock",
+    template: "cluster/environments/fabrikam-common-infra",
     version: "d7d905e6551",
 
     variables: {​
-        resource_group_name: "<resource-group-name>",​
-        cluster_name: "<cluster-name>",​
-        agent_vm_count: 3,​
-        service_principal_id: "<client-id>",
-        service_principal_secret: "<client-secret>",​
-        ssh_public_key: "public-key"​
-        gitops_ssh_url: "git@github.com:timfpark/fabrikate-cloud-native-manifests.git"​
-        gitops_ssh_key: "<path to private gitops repo key>"​
-        vnet_name: "<vnet name>"​
     }​
 }
 ```
 
-## Creating a Specific Cluster Definition
-
-Now that Olina has scaffolded out her desired template for infrascture deployment, she must define one or more specific deployments.  To do this, she issues the command:
-
-```bash
-$ spk infra define --definition discovery-cluster-infra --name discovery-cluster-west
-```
-
-What this does is, using the `discovery-cluster-infra.json` file generated using `spk scaffold`, a cluster definition json `discovery-cluster-west.json` is generated and stored in a directory named `discovery-cluster-west` which is a subdirectory at the same level as the `discovery-cluster-infra.json` file.  The `discovery-cluster-west.json` builds upon with specific information filled in to the cluster.  The cluster specific values may either be hand editted in the file or passed in via the command line as key-value pairs similar to:
-
-```bash
-$ spk infra define --definition discovery-cluster-infra --name discovery-cluster-west --var vnet_name=testvnetwest --var resource_group_name=testrgwest
-```
-
-This would result in a file that resembles:
+Since they want all of their clusters to be of the same size globally, she edits the variable block to include the number of agent VMs and common location for the GitOps repo for each of those clusters that she gets from Dag:
 
 ```js
 {​
-    name: "discovery-cluster-west",
-    base_config: "discovery-cluster-infra",
-    type: "cluster-definition",
-​
+    name: "discovery-service",
+
+    source: "https://github.com/fabrikam/bedrock",
+    template: "cluster/environments/fabrikam-common-infra",
+    version: "d7d905e6551",
+
     variables: {​
-        resource_group_name: "testrgwest",​
-        cluster_name: "discovery-cluster-west",​
-        vnet_name: "testvnetwest"​
+        agent_vm_count: 3,
+        gitops_ssh_url: "git@github.com:fabrikam/discovery-cluster-manifests.git"
     }​
 }
 ```
 
-Olina can repeat this process for additional deployment definitions, say for `east` as `discovery-cluster-east`.  In this case, she would end up with a directory structure resembling:
+Now that Olina has scaffolded out the globally common configuration for the `discovery-service`, she wants to define the first cluster that Fabrikam is deploying in the east region.  To do that, she enters the `discovery-service` directory above and issues the command:
 
 ```bash
-discovery-cluster-infra/
-    -> discovery-cluster-infra.json
-    -> discovery-cluster-west/
-        -> discovery-cluster-west.json
-    -> discovery-cluster-east/
-        -> discovery-cluster-west.json
+$ spk infra scaffold --name east --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-single-keyvault
 ```
 
-TODO: Should service principal details be in this file? (probably not, since it will be checked in)
+Like the previous command, this creates a directory called `east` and creates a `definition.json` file in it with the following:
+
+```js
+{​
+    name: "east",
+
+    source: "https://github.com/fabrikam/bedrock",
+    template: "cluster/environments/fabrikam-single-keyvault",
+    version: "d7d905e6551",
+
+    variables: {​
+    }​
+}
+```
+
+She then fills in the east specific variables for this cluster:
+
+```js
+{​
+    name: "east",
+
+    source: "https://github.com/fabrikam/bedrock",
+    template: "cluster/environments/fabrikam-single-keyvault",
+    version: "d7d905e6551",
+
+    variables: {​
+        cluster_name: "discovery-cluster-east",​
+        gitops_path: "east"
+        resource_group_name: "discovery-cluster-east-rg",​
+        vnet_name: "discovery-cluster-east-vnet"​
+    }​
+}
+```
+
+Likewise, she wants to create a `west` cluster, which she does in the same manner from the `discovery-service` directory:
+
+```bash
+$ spk infra scaffold --name west --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-single-keyvault
+```
+
+And fills in the `definition.json` file with the following `west` specific variables:
+
+```js
+{​
+    name: "west",
+
+    source: "https://github.com/fabrikam/bedrock",
+    template: "cluster/environments/fabrikam-single-keyvault",
+    version: "d7d905e6551",
+
+    variables: {​
+        cluster_name: "discovery-cluster-west",​
+        gitops_path: "west"
+        resource_group_name: "discovery-cluster-west-rg",​
+        vnet_name: "discovery-cluster-west-vnet"​
+    }​
+}
+```
+
+With this, she now has a directory structure resembling:
+
+
+```bash
+discovery-service/
+    definition.json
+    east/
+        definition.json
+    west/
+        definition.json
+```
+
 
 ## Generating Cluster Terraform Templates
 
-When Olina is done defining her cluster definitions, she will need to generate Terraform sctips (and variables) in order to deploy the cluster(s).  This is handled with the command:
+With her cluster infrastructure now defined, she can now generate the Terraform scripts for all the infrastructure for this deployment by navigating to the `discovery-cluster` top level directory and running:
 
 ```bash
-$ spk infra generate --definition discovery-cluster-infra
+$ spk infra generate
 ```
 
-This command reads in the base scaffold definition (in this case `discovery-cluster-infra.json`) and then applies / updates the values with the specific cluster definition and then generates a `terraform.tfvars` file in each defined cluster directory.  So, for the case of `discovery-cluster-west`, the resulting `terraform.tfvars` (based on the above json files) would resemble:
+This command recursively reads in the definition at the current directory level, applies any variables there to the currently running dictionary for the directory scope, and then, if there is a `source` and `template` defined in the current definition, creates a `generated` directory and fills the Terraform definition using that source and template at the specified version and with the accumulated variables.
+
+In Olina's scenario above, this means that `spk` generates three `generated` directories like this with Terraform scripts ready for deployment.
 
 ```bash
-resource_group_name="testrgwest"
-cluster_name="discovery-cluster-west"
-agent_vm_count=3,
-service_principal_id="<client-id>"
-service_principal_secret="<client-secret>",​
-ssh_public_key="public-key"​
-gitops_ssh_url="git@github.com:timfpark/fabrikate-cloud-native-manifests.git"​
-gitops_ssh_key="<path to private gitops repo key>"​
-vnet_name="testvnetwest"​
+discovery-service/
+    definition.json
+    generated/
+        (... common-infra environment template filled with variables from definition.json)
+    east/
+        definition.json
+        generated/
+            (... single-keyvault environment template filled with variables from definition.json in east and the root)
+    west/
+        definition.json
+        generated/
+            (... single-keyvault environment template filled with variables from definition.json in west and the root)
 ```
-
-If for some reason, Olina was just interested in updating a single cluster definition, she could use the same command as follows:
-
-```bash
-$ spk infra generate --definition discovery-cluster-infra --cluster discovery-cluster-east
-```
-
-And this will regenerate just the `terraform.tfvars` file for `discovery-cluster-east` cluster definition.
 
 ## Deploying Cluster
 
-With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.
+With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.  To deploy the infrastructure, she first navigates to `discovery-service/generated` and applies the `common-infra` scripts.
 
 ```bash
 $ terraform init
-$ terraform apply -var-file=discovery-cluster-west.tfvars
+$ terraform apply
 ```
+
+and likewise, afterwards in the `east/generated` and `west/generated` directories.
 
 ## Cluster Scaffolding Management
 
 In the case where Olina might want to take some time off, she needs a process so that her colleague(s) can interact with the scaffolding during her absense.  There are multiple ways to handle this, but one that fits well would be to use some form of a source repository (private VSTS repository, private github repo, etc) which will allow for the maintaining of the directory structure and the sharing of the scaffold information.  One needs to make sure, however, that secrets are not commited to the repository.
+
+TODO: Flesh out this description of how Olina could hand off to another person in an operations role named Odin.
 
 ## Introspect Deployments
 
