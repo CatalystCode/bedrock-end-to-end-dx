@@ -141,12 +141,18 @@ Since they want all of their clusters to be of the same size globally, she edits
     template: "cluster/environments/fabrikam-common-infra",
     version: "d7d905e6551",
 
+    backend: {​
+        storage_account_name: "terraformstate"
+        container_name: "discoveryservice"
+    }​,
+
     variables: {​
         agent_vm_count: 3,
         gitops_ssh_url: "git@github.com:fabrikam/discovery-cluster-manifests.git"
     }​
 }
 ```
+
 
 Now that Olina has scaffolded out the globally common configuration for the `discovery-service`, she wants to define the first cluster that Fabrikam is deploying in the east region.  To do that, she enters the `discovery-service` directory above and issues the command:
 
@@ -164,6 +170,10 @@ Like the previous command, this creates a directory called `east` and creates a 
     template: "cluster/environments/fabrikam-single-keyvault",
     version: "d7d905e6551",
 
+    backend: {
+        key: "east"
+    },
+
     variables: {​
     }​
 }
@@ -178,6 +188,10 @@ She then fills in the east specific variables for this cluster:
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
     version: "d7d905e6551",
+
+    backend: {
+        key: "west"
+    },
 
     variables: {​
         cluster_name: "discovery-cluster-east",​
