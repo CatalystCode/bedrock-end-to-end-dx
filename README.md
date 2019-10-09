@@ -28,7 +28,7 @@ TODO: Is this the case?
 $ spk init
 ```
 
-This creates a `~/.spk/config` file with auth details, validates that prereqs are installed (`git`, `terraform`, `helm`, `az` cli tools), inventories their versions, and validates that they are compatible with `spk`. The tool notices that she does not have a compatible version of `helm` and asks her to update it, which he does with his favorite package manager manually, and then reruns `spk init`.
+This takes a configuration file located by convention at `~/.spk/config`, validates that the prerequisite tools are installed that `spk` relies on, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
 
 ## Adopting Bedrock in Existing Application Monorepo
 
