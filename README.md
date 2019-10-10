@@ -1,8 +1,6 @@
-# Bedrock Developer and Operations Experience "North Star"
+# Bedrock Developer and Operations Experience
 
 A scenario based description of how all the tools and components in Bedrock fit together to easily define, build, deploy, and maintain a workload running in a Kubernetes cluster.
-
-THERE ARE NO SACRED COWS IN THIS DOCUMENT. Please point out misunderstandings, problems, and places that the experience could be better.
 
 ## Getting Started
 
@@ -25,25 +23,23 @@ With `spk` installed, he initializes the `spk` tool with:
 $ spk init ~/.spk/config
 ```
 
-This takes the configuration file at `~/.spk/config` that contains configuration details like Azure access tokens, validates that the prerequisite tools (like  `git`, `az`, etc.) are installed that `spk` relies on, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
+This takes the configuration file at `~/.spk/config` that contains configuration details like Azure access tokens, validates that the prerequisite tools that `spk` relies on (like  `git`, `az`, etc.) are installed, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
 
 ## Adopting Bedrock in Existing Application Monorepo
 
-With his `spk` tool initialized, he wants to add an existing `discovery-service` service to the project. `discovery-service` is a service that is already deployed in a non-containerized environment and has been developed in a [monorepo](https://en.wikipedia.org/wiki/Monorepo) style. As we mentioned, Dag wants to use Bedrock to deploy these microservices, so he navigates to the root of this monorepo that he has cloned on his machine:
+With his `spk` tool initialized, he wants to use it to add an existing monorepo of microservices. `discovery-service` is a service that is already deployed in a non-containerized environment and has been developed in a [monorepo](https://en.wikipedia.org/wiki/Monorepo) style. As we mentioned, Dag wants to use Bedrock to deploy these microservices, so he navigates to the root of this monorepo that he has cloned on his machine:
 
 ```bash
-$ cd discovery-service
+$ cd discovery-monorepo
 ```
 
 and then uses `spk` to initialize it:
-
-TODO: Is this still the case?
 
 ```bash
 $ spk project init -m -d packages
 ```
 
-where `-m` indicates to `spk` that this a monorepo for multiple microservices and that all of our microservices are located in a directory called `packages`.  This creates a `bedrock.yaml` in the root directory that contains the set of known services in this repo.  Looking at this, we can see that it is currently empty:
+where `-m` indicates to `spk` that this a monorepo with multiple multiple microservices and that all of our microservices are located in a directory called `packages`.  This creates a `bedrock.yaml` in the root directory that contains the set of known services in this repo.  Looking at this, we can see that it is currently empty:
 
 ```bash
 $ cat bedrock.yaml
@@ -80,7 +76,7 @@ and adds a `azure-pipelines.yaml` file in `packages/discovery-service` to build 
 $ spk service create-pipeline discovery-service -n discovery-service-ci
 ```
 
-which uses the Azure Devops credentials he established when he ran `init` to create a pipeline that will automatically build the `discovery-service` microservice on each commit to a container that is then pushed to Azure Container Registry.
+which uses the Azure Devops credentials he established when he ran `init` to create a pipeline that will automatically build the `discovery-service` microservice on each commit to a container that is then pushed to Azure Container Registry with an Azure Devops Pipeline called `discovery-service-ci
 
 With all of this setup, Dag commits the files that `spk` created and pushes them to his monorepo:
 
@@ -131,7 +127,7 @@ which she then commits back to the repo. This triggers the generation process an
 
 ## Building Cluster Definition
 
-Olina then moves on to create her infrastructure deployment definition.  She suspects that the project may grow beyond just a single cluster to multiple clusters and wants to be able to scalably add clusters without having to hand manage N sets of Terraform scripts. Each deployment will be similar in structure but differ in a few configuration values (region, connection strings, etc). Infrastructure definitions with `spk` are hierarchical, with each layer inheriting from the layer above it, so she starts by creating the globally common definition between all of her infrastructure:
+Olina then moves on to create her infrastructure deployment definition.  She suspects that the project may grow beyond just a single cluster to multiple clusters and wants to be able to scalably add clusters without having to hand manage N sets of nearly identical Terraform scripts -- each deployment will be similar in structure but differ in a few configuration values (region, connection strings, etc). Infrastructure definitions with `spk` are hierarchical, with each layer inheriting from the layer above it, so she starts by creating the globally common definition between all of her infrastructure:
 
 ```bash
 $ spk infra scaffold --name discovery-service --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-common-infra
@@ -306,9 +302,9 @@ TODO: Flesh out this description of how Olina could hand off to another person i
 
 ## Introspect Deployments
 
-As Dag and his development team make changes that are deployed into the cluster, they want to be able to observe how these changes progress from a commit to the source code repo, to pushing the container from that build to ACR, to updating the high level definition with this container's image tag, the manifest being generated from this high level definition change, and Flux applying this change within the cluster.
+As Dag and his development team make changes that are deployed into the cluster through the whole GitOps pipeline: they want to be able to observe how these changes progress from a commit to the source code repo, to pushing the container from that build to ACR, to updating the high level definition with this container's image tag, to the manifest being generated from this high level definition change, and Flux applying this change within the cluster.
 
-In the absence of tooling, all of this GitOps pipeline is observable, but only through manual navigation to all of these various stages and/or manually collecting logs from Flux in the cluster. This is tedious and less than ideal.
+In the absence of tooling, all of this GitOps pipeline is observable, but only through manual navigation of all of the various stages and/or manually collecting logs from Flux in the cluster. This is tedious and leads to lost developer productivity.
 
 Instead, Dag wants to use `spk` to introspect the status of these deployments.  His `spk` config file has the connection details for how to do that, so he can simply type in his CLI:
 
