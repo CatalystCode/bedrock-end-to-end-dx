@@ -10,8 +10,6 @@ Dag, who is in an developer role at a company called Fabrikam, has heard about B
 
 He first installs the `spk` tool, which provides helpful automation around defining and operating Kubernetes clusters with Bedrock principles:
 
-TODO: Confirm this is how we are going to install `spk`
-
 ```bash
 $ wget https://github.com/microsoft/spektate/releases/download/1.0.1/spk-v1.0.1-darwin-amd64.zip
 $ unzip spk-v1.0.1-darwin-amd64.zip
@@ -22,13 +20,12 @@ $ mv spk ~/bin (or as appropriate to place it in your path)
 
 With `spk` installed, he initializes the `spk` tool with:
 
-TODO: Is this the case?
 
 ```bash
-$ spk init
+$ spk init ~/.spk/config
 ```
 
-This takes a configuration file located by convention at `~/.spk/config`, validates that the prerequisite tools are installed that `spk` relies on, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
+This takes the configuration file at `~/.spk/config` that contains configuration details like Azure access tokens, validates that the prerequisite tools (like  `git`, `az`, etc.) are installed that `spk` relies on, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
 
 ## Adopting Bedrock in Existing Application Monorepo
 
@@ -43,38 +40,61 @@ and then uses `spk` to initialize it:
 TODO: Is this still the case?
 
 ```bash
-$ spk project init -m
+$ spk project init -m -d packages
 ```
 
-where `-m` indicates to `spk` that this a monorepo for multiple microservices.
+where `-m` indicates to `spk` that this a monorepo for multiple microservices and that all of our microservices are located in a directory called `packages`.  This creates a `bedrock.yaml` in the root directory that contains the set of known services in this repo.  Looking at this, we can see that it is currently empty:
 
-## Adding an Existing Service
+```bash
+$ cat bedrock.yaml
+services: {}
+```
+
+## Adding a Service
 
 The core `discovery-service` microservice already exists, so he grandfathers it into the Bedrock workflow with:
 
 ```bash
-$ spk service create discovery-service
+$ spk service create discovery-service -d packages
 ```
 
-This service has an existing `azure-pipelines.yaml` file, so the tool is smart enough to skip adding a scaffolded version, but it does scaffold out both a `maintainers` and `Bedrockconfig` file.
-
-TODO: Is this correct?
-
-`service create` also uses cached credentials to create a Azure Devops build pipeline for the `azure-pipelines.yaml` file to process on each commit to build the application, and in this case, push a container to Azure Container Registry.
-
-Since the high level definition and resource manifest repos specified don't currently exist, it prints a warning that it is creating them, and then creates them with a high level Fabriakte definition that includes this service. It then creates a release pipeline step to automatically update the image in the Fabrikate high level definition with each push to ACR and also creates the build pipeline step to build the high level definition and check the results into resource manifest repo.
-
-## Adding a New Service
-
-Dag moves on to a second, and new, microservice called the `proxy-service`. He starts by creating a development branch called `add_proxy_service` on the overall monorepo, and then scaffolds the project with:
+This updates the bedrock.yaml file to include this service:
 
 ```bash
-$ spk service create proxy-service
+$ cat bedrock.yaml
+services:
+    ./packages/discovery-service:
+        helm:
+            chart:
+                branch: ''
+                git: ''
+                path: ''
+
 ```
 
-Since this is a completely new service, this creates a directory called `proxy-service` in the overall monorepo and scaffolds it out with a `maintainers`, `Bedrockconfig`, and `azure-pipeline.yaml` file.
+and adds a `azure-pipelines.yaml` file in `packages/discovery-service` to build it.
 
-Like the previous service, it also creates the source to Azure Container Registry Azure Devops pipeline build step and release step to update the image in the Fabrikate high level definition. However, it checks and notices that the previous service has created all of the other required repos and infrastructure, and so does not need to create them, and finishes.
+`spk` also includes automation for creating the Azure Devops pipeline in Azure itself.  To create that, Dag executes:
+
+```bash
+$ spk service create-pipeline discovery-service -n discovery-service-ci
+```
+
+which uses the Azure Devops credentials he established when he ran `init` to create a pipeline that will automatically build the `discovery-service` microservice on each commit to a container that is then pushed to Azure Container Registry.
+
+With all of this setup, Dag commits the files that `spk` created and pushes them to his monorepo:
+
+```bash
+$ git add bedrock.yaml
+$ git add maintainers.yaml
+$ git add packages/discovery-service/azure-pipelines.yaml
+$ git commit -m 'Add discovery-service build pipeline'
+$ git push origin HEAD
+```
+
+This automatically kicks off a Azure Devops build and builds a container for the `discovery-service` that is pushed to Azure Container Registry.
+
+Dag repeats the `service create`, `service create-pipeline`, and `git push` steps for each of the microservices that make up the deployment.
 
 ## Building High Level Definition
 
@@ -305,12 +325,16 @@ $ spk deployment add --name discovery-service
 This adds introspection to the `discovery-service` pipeline.  With that, on future commits, he can observe deployments with:
 
 ```bash
-$ spk deployment get --service proxy-service
+$ spk deployment get --service discovery-service
+
+Start Time            Service        Deployment   Commit  Src to ACR Image Tag                  Result ACR to HLD Env Hld Commit Result HLD to Manifest Result Duration  Status   Manifest Commit End Time
+10/9/2019, 4:00:32 PM hello-bedrock  178fdc0bc226 5b54eb4 6342       hello-bedrock-master-6342  ✓      225        DEV 99ffcec    ✓      6343            ✓      4.23 mins Complete 20d199d         10/9/2019, 4:03:56 PM
+10/9/2019, 3:07:57 PM hello-bedrock  c66bab558257 5b54eb4 6340       hello-bedrock-master-6340  ✓      224        DEV 80033b7    ✓      6341            ✓      3.69 mins Complete df32861         10/9/2019, 3:10:41 PM
+10/9/2019, 2:52:42 PM hello-bedrock  4099dea7d5ed 5b54eb4 6338       hello-bedrock-master-6338  ✓      223        DEV 333dc79    ✓      6339            ✓      3.62 mins Complete e8422e0         10/9/2019, 2:55:18 PM
+9/26/2019, 3:13:20 PM hello-bedrock  1e680e920c27 5b54eb4 6178       hello-bedrock-master-6178  ✓      209        DEV bc341e0    ✓      6182            ✓      4.34 mins Complete a58001d         9/26/2019, 3:16:53 PM
+9/26/2019, 3:13:12 PM hello-bedrock  939dcb6e3464 5b54eb4 6177       hello-bedrock-master-6177  ✓      208        DEV f007812    ✓      6180            х      3.00 mins Complete                 9/26/2019, 3:15:28 PM
+9/26/2019, 3:13:03 PM hello-spektate a902f747d4cc a0bca78 6176       hello-spektate-master-6176 ✓      207        DEV c15c700    ✓      6181            ✓      4.45 mins Complete a58001d         9/26/2019, 3:16:46 PM
 ```
-
-which displays a new log line in her console as each step is completed that looks like
-
-TODO: Insert table view from output
 
 ## Updating to New Infra Template Version
 
