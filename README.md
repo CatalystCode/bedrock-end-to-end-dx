@@ -310,31 +310,21 @@ As Dag and his development team make changes that are deployed into the cluster,
 
 In the absence of tooling, all of this GitOps pipeline is observable, but only through manual navigation to all of these various stages and/or manually collecting logs from Flux in the cluster. This is tedious and less than ideal.
 
-Instead, Dag wants to use `spk` to introspect the status of these deployments. He first initializes the deployment with all of config needed to enable `spk` to have access to various pieces of infrastructure it needs to understand the current state:
-
-```bash
-$ spk deployment init --storage-account=xxxx --storage-key=xxxx ...
-```
-
-Next, since his `discovery-service` microservice wasn't initially created with introspection enabled, he adds these hooks with:
-
-```bash
-$ spk deployment add --name discovery-service
-```
-
-This adds introspection to the `discovery-service` pipeline.  With that, on future commits, he can observe deployments with:
+Instead, Dag wants to use `spk` to introspect the status of these deployments.  His `spk` config file has the connection details for how to do that, so he can simply type in his CLI:
 
 ```bash
 $ spk deployment get --service discovery-service
 
 Start Time            Service        Deployment   Commit  Src to ACR Image Tag                  Result ACR to HLD Env Hld Commit Result HLD to Manifest Result Duration  Status   Manifest Commit End Time
-10/9/2019, 4:00:32 PM hello-bedrock  178fdc0bc226 5b54eb4 6342       hello-bedrock-master-6342  ✓      225        DEV 99ffcec    ✓      6343            ✓      4.23 mins Complete 20d199d         10/9/2019, 4:03:56 PM
-10/9/2019, 3:07:57 PM hello-bedrock  c66bab558257 5b54eb4 6340       hello-bedrock-master-6340  ✓      224        DEV 80033b7    ✓      6341            ✓      3.69 mins Complete df32861         10/9/2019, 3:10:41 PM
-10/9/2019, 2:52:42 PM hello-bedrock  4099dea7d5ed 5b54eb4 6338       hello-bedrock-master-6338  ✓      223        DEV 333dc79    ✓      6339            ✓      3.62 mins Complete e8422e0         10/9/2019, 2:55:18 PM
-9/26/2019, 3:13:20 PM hello-bedrock  1e680e920c27 5b54eb4 6178       hello-bedrock-master-6178  ✓      209        DEV bc341e0    ✓      6182            ✓      4.34 mins Complete a58001d         9/26/2019, 3:16:53 PM
-9/26/2019, 3:13:12 PM hello-bedrock  939dcb6e3464 5b54eb4 6177       hello-bedrock-master-6177  ✓      208        DEV f007812    ✓      6180            х      3.00 mins Complete                 9/26/2019, 3:15:28 PM
-9/26/2019, 3:13:03 PM hello-spektate a902f747d4cc a0bca78 6176       hello-spektate-master-6176 ✓      207        DEV c15c700    ✓      6181            ✓      4.45 mins Complete a58001d         9/26/2019, 3:16:46 PM
+10/9/2019, 4:00:32 PM discovery-service  178fdc0bc226 5b54eb4 6342       discovery-service-master-6342  ✓      225        DEV 99ffcec    ✓      6343            ✓      4.23 mins Complete 20d199d         10/9/2019, 4:03:56 PM
+10/9/2019, 3:07:57 PM discovery-service  c66bab558257 5b54eb4 6340       discovery-service-master-6340  ✓      224        DEV 80033b7    ✓      6341            ✓      3.69 mins Complete df32861         10/9/2019, 3:10:41 PM
+10/9/2019, 2:52:42 PM discovery-service  4099dea7d5ed 5b54eb4 6338       discovery-service-master-6338  ✓      223        DEV 333dc79    ✓      6339            ✓      3.62 mins Complete e8422e0         10/9/2019, 2:55:18 PM
+9/26/2019, 3:13:20 PM discovery-service  1e680e920c27 5b54eb4 6178       discovery-service-master-6178  ✓      209        DEV bc341e0    ✓      6182            ✓      4.34 mins Complete a58001d         9/26/2019, 3:16:53 PM
+9/26/2019, 3:13:12 PM discovery-service  939dcb6e3464 5b54eb4 6177       discovery-service-master-6177  ✓      208        DEV f007812    ✓      6180            х      3.00 mins Complete                 9/26/2019, 3:15:28 PM
+9/26/2019, 3:13:03 PM discovery-service a902f747d4cc a0bca78 6176       discovery-service-master-6176 ✓      207        DEV c15c700    ✓      6181            ✓      4.45 mins Complete a58001d         9/26/2019, 3:16:46 PM
 ```
+
+and watch his recent deployment flow through the GitOps pipeline.
 
 ## Updating to New Infra Template Version
 
