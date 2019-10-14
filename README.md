@@ -323,7 +323,7 @@ In the case where Olina might want to take some time off, she needs a process so
 
 TODO: Flesh out this description of how Olina could hand off to another person in an operations role named Odin.
 
-## Monitor GitOps Process
+## Monitor Deployments in GitOps Process
 
 As Dag and his development team make changes that are deployed into the cluster through the whole GitOps process: they want to be able to observe how these changes progress from a commit to the source code repo, to pushing the container from that build to ACR, to updating the high level definition with this container's image tag, to the manifest being generated from this high level definition change, and Flux applying this change within the cluster.
 
