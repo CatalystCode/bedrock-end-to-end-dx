@@ -157,7 +157,7 @@ $ spk infra scaffold --name discovery-cluster --source https://github.com/fabrik
 
 This creates a directory called `discovery-cluster` and places a `definition.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team without them opting into a change) and a block for setting variables that are globally the same for the discovery-cluster and a Terraform template called `fabrikam-common-infra` that contains all of their common infrastructure items.
 
-```json
+```js
 {​
     name: "discovery-cluster",
     source: "https://github.com/fabrikam/bedrock",
@@ -200,7 +200,7 @@ $ spk infra scaffold --name east --source https://github.com/fabrikam/bedrock --
 
 Like the previous command, this creates a directory called `east` and creates a `definition.json` file in it with the following:
 
-```json
+```js
 {​
     name: "east",
 
@@ -219,7 +219,7 @@ Like the previous command, this creates a directory called `east` and creates a 
 
 She then fills in the east specific variables for this cluster:
 
-```json
+```js
 {​
     name: "east",
 
@@ -248,7 +248,7 @@ $ spk infra scaffold --name west --source https://github.com/fabrikam/bedrock --
 
 And fills in the `definition.json` file with the following `west` specific variables:
 
-```json
+```js
 {​
     name: "west",
 
@@ -351,7 +351,7 @@ After several weeks, Olina returns to the `discovery-cluster` project upon the r
 
 Because she used `spk` to build her infra deployment definitions, she can do this by simply adjusting the `version` field in her `east` cluster deployment to the new tag `3bfeff7f77` by replacing the old tag `d7d905e6551`, and then regenerating the infra deployment templates with:
 
-```json
+```js
 {​
     name: "east",
 
