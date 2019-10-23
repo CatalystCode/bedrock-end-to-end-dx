@@ -311,7 +311,7 @@ After several weeks, Olina returns to the `discovery-cluster` project upon the r
 Olina can do this by adjusting the version field from the old `v1.0` to the new `v1.1` template. This will cause `spk` to fetch the environment template at the `v1.1` tag.
 
 
-```json
+```js
 {​
     name: "discovery-cluster",
 
@@ -347,7 +347,7 @@ She can use a similar technique to rollout variable level changes as well.  For 
 
 She can do this in the same manner as she rolled out the template upgrade above but adjusting the relevant variable in her definition:
 
-```json
+```js
 {​
     name: "discovery-cluster",
 
