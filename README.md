@@ -134,35 +134,35 @@ $ spk infra scaffold --name discovery-service --source https://github.com/fabrik
 
 This creates a directory called `discovery-cluster` and places a `definition.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team without them opting into a change) and a block for setting variables that are globally the same for the discovery-cluster and a Terraform template called `fabrikam-single-keyvault` that contains all of their common infrastructure items.
 
-```json
-{​
+```js
+{
     name: "discovery-cluster",
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
     version: "v1.0",
 
-    variables: {​
-    }​
+    variables: {
+    }
 }
 ```
 
 Since they want all of their clusters to be of the same size globally, she edits the variable block to include the number of node VMs and common location for the GitOps repo for each of those clusters that she gets from Dag:
 
-```json
-{​
+```js
+{
     name: "discovery-cluster",
 
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
     version: "v1.0",
 
-    variables: {​
+    variables: {
         backend_storage_account_name: "tfstate"
         backend_container_name: "discoveryservice",
 
         agent_vm_count: 16,
         gitops_ssh_url: "git@github.com:fabrikam/discovery-cluster-manifests.git"
-    }​
+    }
 }
 ```
 
@@ -176,28 +176,28 @@ $ spk infra scaffold --name east
 Like the previous command, this creates a directory called `east` and creates a `definition.json` file in it with the following:
 
 ```js
-{​
+{
     name: "east",
 
-    variables: {​
-    }​
+    variables: {
+    }
 }
 ```
 
 She then fills in the east specific variables for this cluster:
 
 ```js
-{​
+{
     name: "east",
 
-    variables: {​
+    variables: {
         backend_key: "east",
 
-        cluster_name: "discovery-cluster-east",​
+        cluster_name: "discovery-cluster-east",
         gitops_path: "east"
-        resource_group_name: "discovery-cluster-east-rg",​
-        vnet_name: "discovery-cluster-east-vnet"​
-    }​
+        resource_group_name: "discovery-cluster-east-rg",
+        vnet_name: "discovery-cluster-east-vnet"
+    }
 }
 ```
 
@@ -210,17 +210,17 @@ $ spk infra scaffold --name west
 And fills in the `definition.json` file with the following `west` specific variables:
 
 ```js
-{​
+{
     name: "west",
 
-    variables: {​
+    variables: {
         backend_key: "west",
 
-        cluster_name: "discovery-cluster-west",​
+        cluster_name: "discovery-cluster-west",
         gitops_path: "west"
-        resource_group_name: "discovery-cluster-west-rg",​
-        vnet_name: "discovery-cluster-west-vnet"​
-    }​
+        resource_group_name: "discovery-cluster-west-rg",
+        vnet_name: "discovery-cluster-west-vnet"
+    }
 }
 ```
 
