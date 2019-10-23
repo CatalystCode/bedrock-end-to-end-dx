@@ -126,13 +126,13 @@ which she then commits back to the repo. This triggers the generation process an
 
 ## Building Cluster Definition
 
-Olina then moves on to create her infrastructure deployment definition.  She suspects that the project may grow beyond just a single cluster to multiple clusters and wants to be able to scalably add and manage N clusters without having to hand manage N sets of nearly identical Terraform code and config. Instead, she would like that each deployment will be similar in structure but differ in a few configuration values (region, connection strings, etc). Infrastructure definitions with `spk` are hierarchical, with each layer inheriting from the layer above it, so she starts by creating the globally common definition between all of her infrastructure:
+Olina then moves on to create her infrastructure deployment definition.  She knows that in the long term the project will grow beyond just a single cluster to multiple clusters and wants to be able to scalably add and manage these clusters without having to hand manage N sets of nearly identical Terraform code and config. Instead, she would like to exploit the fact that each deployment will be nearly exactly the same in structure but differ in a few configuration values (region, connection strings, etc). `spk` allows her to do this with hierarchical deployment definitions, where each layer inherits from the layer above it.  Given this, she starts by creating the globally common definition between all of her infrastructure:
 
 ```bash
-$ spk infra scaffold --name discovery-service --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-single-keyvault
+$ spk infra scaffold --name discovery-cluster --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-single-keyvault
 ```
 
-This creates a directory called `discovery-cluster` and places a `definition.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team without them opting into a change) and a block for setting variables that are globally the same for the discovery-cluster and a Terraform template called `fabrikam-single-keyvault` that contains all of their common infrastructure items.
+This creates a directory called `discovery-cluster` and places a `definition.json` file with a locked version (such that it does not change underneath the infrastructure team without them opting into a change) that is a tag in the git repo and a block for setting variables that are globally the same for the discovery-cluster and a Terraform template called `fabrikam-single-keyvault` that contains all of their common infrastructure items.
 
 ```js
 {
@@ -196,7 +196,8 @@ She then fills in the east specific variables for this cluster:
         cluster_name: "discovery-cluster-east",
         gitops_path: "east"
         resource_group_name: "discovery-cluster-east-rg",
-        vnet_name: "discovery-cluster-east-vnet"
+        vnet_name: "discovery-cluster-east-vnet",
+        ...
     }
 }
 ```
@@ -219,7 +220,8 @@ And fills in the `definition.json` file with the following `west` specific varia
         cluster_name: "discovery-cluster-west",
         gitops_path: "west"
         resource_group_name: "discovery-cluster-west-rg",
-        vnet_name: "discovery-cluster-west-vnet"
+        vnet_name: "discovery-cluster-west-vnet",
+        ...
     }
 }
 ```
@@ -237,7 +239,7 @@ discovery-cluster/
 ```
 
 
-## Generating Cluster Terraform Templates
+## Generating Deployable Cluster Terraform Scripts
 
 With her cluster infrastructure now defined, she can now generate the Terraform scripts for all the infrastructure for this deployment by navigating to the `discovery-cluster` top level directory and running:
 
@@ -245,7 +247,7 @@ With her cluster infrastructure now defined, she can now generate the Terraform 
 $ spk infra generate east
 ```
 
-This command recursively reads in the definition at the current directory level, applies the `definition.json` there to the currently running dictionary for the directory scope, and descends the path step by step.  At the final directory scope, it creates a `generated` directory and fills the Terraform definition using the source and template at the specified version and with the accumulated variables.
+This command recursively reads in the definition at the current directory level, applies the `definition.json` there to the currently running dictionary for the directory scope, and descends the path step by step.  At the final leaf directory, it creates a `generated` directory and fills the Terraform definition using the source and template at the specified version and with the accumulated variables.
 
 Likewise, she generates the west template with:
 ```bash
@@ -269,10 +271,11 @@ discovery-cluster/
 
 ## Deploying Cluster
 
-With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.  To deploy the infrastructure, she first navigates to `discovery-cluster/east/generated`.
+With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.  To deploy the infrastructure, she first navigates to `discovery-cluster/east/generated` and then issues the usual set of `terraform` commands.
 
 ```bash
 $ terraform init
+$ terraform plan
 $ terraform apply
 ```
 
@@ -299,17 +302,16 @@ Start Time            Service        Deployment   Commit  Src to ACR Image Tag  
 10/9/2019, 2:52:42 PM discovery-service  4099dea7d5ed 5b54eb4 6338       discovery-service-master-6338  ✓      223        DEV 333dc79    ✓      6339            ✓      3.62 mins Complete e8422e0         10/9/2019, 2:55:18 PM
 9/26/2019, 3:13:20 PM discovery-service  1e680e920c27 5b54eb4 6178       discovery-service-master-6178  ✓      209        DEV bc341e0    ✓      6182            ✓      4.34 mins Complete a58001d         9/26/2019, 3:16:53 PM
 9/26/2019, 3:13:12 PM discovery-service  939dcb6e3464 5b54eb4 6177       discovery-service-master-6177  ✓      208        DEV f007812    ✓      6180            х      3.00 mins Complete                 9/26/2019, 3:15:28 PM
-9/26/2019, 3:13:03 PM discovery-service a902f747d4cc a0bca78 6176       discovery-service-master-6176 ✓      207        DEV c15c700    ✓      6181            ✓      4.45 mins Complete a58001d         9/26/2019, 3:16:46 PM
+9/26/2019, 3:13:03 PM discovery-service a902f747d4cc a0bca78 6176        discovery-service-master-6176  ✓      207        DEV c15c700    ✓      6181            ✓      4.45 mins Complete a58001d         9/26/2019, 3:16:46 PM
 ```
 
 and watch his recent deployment flow through the GitOps pipeline.
 
 ## Updating Template Version
 
-After several weeks, Olina returns to the `discovery-cluster` project upon the request of her lead.  In the meantime, the central infra template they use for their application cluster deployments, `fabrikam-single-keyvault` has added a new piece of Azure infrastructure that they would like to include in the `east` and `west` cluster deployments they currently have in operations.
+After several weeks, Olina returns to the `discovery-cluster` project upon the request of her lead. In the meantime, the central infra template they use for their application cluster deployments, `fabrikam-single-keyvault` has added a new piece of Azure infrastructure that they would like to include in the `east` and `west` cluster deployments they currently have in operations.
 
-Olina can do this by adjusting the version field from the old `v1.0` to the new `v1.1` template. This will cause `spk` to fetch the environment template at the `v1.1` tag.
-
+Olina can do this by adjusting the version field from the old `v1.0` to the new `v1.1` template. This will cause `spk` to fetch the updated environment template at the `v1.1` tag.
 
 ```js
 {​
@@ -339,7 +341,7 @@ This will fetch the `fabrikam-single-keyvault` environment template at this new 
 
 She then reapplies the `east` cluster, watches the deployment successfully apply, and watches her metrics until she is convinced that the deployment was a success.
 
-She repeats this process for the `west` cluster by generating the `west` cluster and applying it.
+She repeats this process for the `west` cluster by generating the `west` cluster and applying it in the same manner.
 
 ## Kubernetes Upgrades
 
