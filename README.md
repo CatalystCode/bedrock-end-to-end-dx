@@ -6,7 +6,7 @@ A scenario based description of how all the tools and components in Bedrock fit 
 
 Dag, who is in an developer role at a company called Fabrikam, has heard about Bedrock from others in his company and would like to use it on a project he is leading to launch a microservice workload called `discovery-service`.
 
-He first installs the `spk` tool, which provides helpful automation around defining and operating Kubernetes clusters with Bedrock principles:
+He first installs the `spk` tool (and its prerequisites), which provides helpful automation around defining and operating Kubernetes clusters with Bedrock principles:
 
 ```bash
 $ wget https://github.com/microsoft/spektate/releases/download/1.0.1/spk-v1.0.1-darwin-amd64.zip
@@ -16,14 +16,13 @@ $ mv spk ~/bin (or as appropriate to place it in your path)
 
 ## Initializing spk tool
 
-With `spk` installed, he initializes the `spk` tool with:
-
+With `spk` installed he then initializes the `spk` tool with:
 
 ```bash
-$ spk init ~/.spk/config
+$ spk init ./spk-config.yaml
 ```
 
-This takes the configuration file at `~/.spk/config` that contains configuration details like Azure access tokens, validates that the prerequisite tools that `spk` relies on (like  `git`, `az`, etc.) are installed, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
+This takes the configuration file, which he created [following this pattern](https://github.com/CatalystCode/spk/blob/master/spk-config.yaml), that contains configuration details like Azure access tokens, validates that the prerequisite tools that `spk` relies on (like  `git`, `az`, etc.) are installed, inventories their versions, validates that the version being run is compatible with `spk`, and configures them as necessary with the values provided in the config file.
 
 ## Adopting Bedrock in Existing Application Monorepo
 
@@ -36,10 +35,10 @@ $ cd discovery-monorepo
 and then uses `spk` to initialize it:
 
 ```bash
-$ spk project init -m -d packages
+$ spk project init -m -d services
 ```
 
-where `-m` indicates to `spk` that this a monorepo with multiple multiple microservices and that all of our microservices are located in a directory called `packages`.  This creates a `bedrock.yaml` in the root directory that contains the set of known services in this repo.  Looking at this, we can see that it is currently empty:
+where `-m` indicates to `spk` that this a monorepo with multiple multiple microservices and that all of our microservices are located in a directory called `services`.  This creates a `bedrock.yaml` in the root directory that contains the set of known services in this repo.  Looking at this, we can see that it is currently empty:
 
 ```bash
 $ cat bedrock.yaml
@@ -51,7 +50,7 @@ services: {}
 The core `discovery-service` microservice already exists, so he grandfathers it into the Bedrock workflow with:
 
 ```bash
-$ spk service create discovery-service -d packages
+$ spk service create discovery-service -d services
 ```
 
 This updates the bedrock.yaml file to include this service:
@@ -59,7 +58,7 @@ This updates the bedrock.yaml file to include this service:
 ```bash
 $ cat bedrock.yaml
 services:
-    ./packages/discovery-service:
+    ./services/discovery-service:
         helm:
             chart:
                 branch: ''
@@ -68,7 +67,7 @@ services:
 
 ```
 
-and adds a `azure-pipelines.yaml` file in `packages/discovery-service` to build it.
+and adds a `azure-pipelines.yaml` file in `services/discovery-service` to build it.
 
 `spk` also includes automation for creating the Azure Devops pipeline in Azure itself.  To create that, Dag executes:
 
@@ -83,7 +82,7 @@ With all of this setup, Dag commits the files that `spk` created and pushes them
 ```bash
 $ git add bedrock.yaml
 $ git add maintainers.yaml
-$ git add packages/discovery-service/azure-pipelines.yaml
+$ git add services/discovery-service/azure-pipelines.yaml
 $ git commit -m 'Add discovery-service build pipeline'
 $ git push origin HEAD
 ```
@@ -133,11 +132,11 @@ Olina then moves on to create her infrastructure deployment definition.  She sus
 $ spk infra scaffold --name discovery-service --source https://github.com/fabrikam/bedrock --template cluster/environments/fabrikam-single-keyvault
 ```
 
-This creates a directory called `discovery-service` and places a `definition.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team without them opting into a change) and a block for setting variables that are globally the same for the discovery-service and a Terraform template called `fabrikam-single-keyvault` that contains all of their common infrastructure items.
+This creates a directory called `discovery-cluster` and places a `definition.json` file with a locked source at the latest version (such that it does not change underneath the infrastructure team without them opting into a change) and a block for setting variables that are globally the same for the discovery-cluster and a Terraform template called `fabrikam-single-keyvault` that contains all of their common infrastructure items.
 
 ```json
 {​
-    name: "discovery-service",
+    name: "discovery-cluster",
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
     version: "v1.0",
@@ -151,7 +150,7 @@ Since they want all of their clusters to be of the same size globally, she edits
 
 ```json
 {​
-    name: "discovery-service",
+    name: "discovery-cluster",
 
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
@@ -168,7 +167,7 @@ Since they want all of their clusters to be of the same size globally, she edits
 ```
 
 
-Now that Olina has scaffolded out the globally common configuration for the `discovery-service`, she wants to define the first cluster that Fabrikam is deploying in the east region.  To do that, she enters the `discovery-service` directory above and issues the command:
+Now that Olina has scaffolded out the globally common configuration for the `discovery-cluster`, she wants to define the first cluster that Fabrikam is deploying in the east region.  To do that, she enters the `discovery-cluster` directory above and issues the command:
 
 ```bash
 $ spk infra scaffold --name east
@@ -202,7 +201,7 @@ She then fills in the east specific variables for this cluster:
 }
 ```
 
-Likewise, she wants to create a `west` cluster, which she does in the same manner from the `discovery-service` directory:
+Likewise, she wants to create a `west` cluster, which she does in the same manner from the `discovery-cluster` directory:
 
 ```bash
 $ spk infra scaffold --name west
@@ -229,7 +228,7 @@ With this, she now has a directory structure resembling:
 
 
 ```bash
-discovery-service/
+discovery-cluster/
     definition.json
     east/
         definition.json
@@ -256,7 +255,7 @@ $ spk infra generate west
 With this, `spk` has created the `generated` directories like this with Terraform scripts ready for deployment.
 
 ```bash
-discovery-service/
+discovery-cluster/
     definition.json
     east/
         definition.json
@@ -270,14 +269,14 @@ discovery-service/
 
 ## Deploying Cluster
 
-With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.  To deploy the infrastructure, she first navigates to `discovery-service/east/generated`.
+With the above defined and the Terraform scripts generated, Olina can leverage Terraform tools she has installed to deploy (or update) the defined clusters.  To deploy the infrastructure, she first navigates to `discovery-cluster/east/generated`.
 
 ```bash
 $ terraform init
 $ terraform apply
 ```
 
-and likewise, afterwards in the `discovery-service/west/generated` directories.
+and likewise, afterwards in the `discovery-cluster/west/generated` directories.
 
 ## Committing Cluster Definitions
 
@@ -307,14 +306,14 @@ and watch his recent deployment flow through the GitOps pipeline.
 
 ## Updating Template Version
 
-After several weeks, Olina returns to the `discovery-service` project upon the request of her lead.  In the meantime, the central infra template they use for their application cluster deployments, `fabrikam-single-keyvault` has added a new piece of Azure infrastructure that they would like to include in the `east` and `west` cluster deployments they currently have in operations.
+After several weeks, Olina returns to the `discovery-cluster` project upon the request of her lead.  In the meantime, the central infra template they use for their application cluster deployments, `fabrikam-single-keyvault` has added a new piece of Azure infrastructure that they would like to include in the `east` and `west` cluster deployments they currently have in operations.
 
 Olina can do this by adjusting the version field from the old `v1.0` to the new `v1.1` template. This will cause `spk` to fetch the environment template at the `v1.1` tag.
 
 
 ```json
 {​
-    name: "discovery-service",
+    name: "discovery-cluster",
 
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
@@ -350,7 +349,7 @@ She can do this in the same manner as she rolled out the template upgrade above 
 
 ```json
 {​
-    name: "discovery-service",
+    name: "discovery-cluster",
 
     source: "https://github.com/fabrikam/bedrock",
     template: "cluster/environments/fabrikam-single-keyvault",
